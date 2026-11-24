@@ -55,5 +55,23 @@
     }
   }
 
-  return { configure, weightUnit, fromLbs, fmtWeight, plural, fmtDuration, fmtDate, fmtShortDate, fmtAgo, describeSet };
+  /** Calendar date {y, m (1-12), d} of `unix` in the configured time zone (device zone if unset). */
+  function dateParts(unix) {
+    const parts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "numeric", day: "numeric", timeZone })
+      .formatToParts(new Date(unix * 1000));
+    const get = (t) => Number(parts.find((p) => p.type === t).value);
+    return { y: get("year"), m: get("month"), d: get("day") };
+  }
+
+  // Period starts are calendar dates stored as UTC midnight (see Metrics.dayKey), so format them in UTC.
+  const utc = (key, opts) => new Date(key * 1000).toLocaleDateString("en-US", { ...opts, timeZone: "UTC" });
+  function fmtPeriod(key, period) {
+    if (period === "year") return utc(key, { year: "numeric" });
+    if (period === "month") return utc(key, { month: "short" }) + " ’" + utc(key, { year: "2-digit" });
+    return utc(key, { month: "short", day: "numeric" });
+  }
+  const fmtMonth = (key) => utc(key, { month: "long", year: "numeric" });
+
+  return { configure, weightUnit, fromLbs, fmtWeight, plural, fmtDuration, fmtDate, fmtShortDate, fmtAgo, describeSet,
+    dateParts, fmtPeriod, fmtMonth };
 });

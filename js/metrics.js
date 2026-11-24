@@ -55,5 +55,38 @@
     return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day) / 1000);
   }
 
-  return { logVolume, sessionVolume, sessionSets, e1rm, progressPoint, weekStart };
+  // ---- Calendar periods ----
+  // A "day key" is the UTC-midnight timestamp of a calendar date. Callers build it from the date in the
+  // user's time zone (Format.dateParts), so bucketing never depends on where the code happens to run.
+  const PERIODS = ["day", "week", "month", "year"];
+  const dayKey = ({ y, m, d }) => Date.UTC(y, m - 1, d) / 1000;
+
+  /** Start (day key) of the day/week (Monday)/month/year containing `key`. */
+  function periodStart(key, period) {
+    const dt = new Date(key * 1000);
+    const y = dt.getUTCFullYear(), m = dt.getUTCMonth();
+    if (period === "day") return key;
+    if (period === "week") return key - ((dt.getUTCDay() + 6) % 7) * 86400;
+    if (period === "month") return Date.UTC(y, m, 1) / 1000;
+    return Date.UTC(y, 0, 1) / 1000;
+  }
+
+  /** The period start `n` periods after `start` (negative = earlier). */
+  function shiftPeriod(start, period, n) {
+    const dt = new Date(start * 1000);
+    const y = dt.getUTCFullYear(), m = dt.getUTCMonth(), d = dt.getUTCDate();
+    if (period === "day") return Date.UTC(y, m, d + n) / 1000;
+    if (period === "week") return Date.UTC(y, m, d + 7 * n) / 1000;
+    if (period === "month") return Date.UTC(y, m + n, 1) / 1000;
+    return Date.UTC(y + n, 0, 1) / 1000;
+  }
+
+  /** `count` consecutive period starts, oldest first, ending with the period that contains `lastKey`. */
+  function periodRange(lastKey, period, count) {
+    const last = periodStart(lastKey, period);
+    return Array.from({ length: count }, (_, i) => shiftPeriod(last, period, i - count + 1));
+  }
+
+  return { logVolume, sessionVolume, sessionSets, e1rm, progressPoint, weekStart,
+    PERIODS, dayKey, periodStart, shiftPeriod, periodRange };
 });

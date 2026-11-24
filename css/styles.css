@@ -83,3 +83,63 @@ code { font-size: 0.92em; background: var(--accent-soft); padding: 1px 5px; bord
   width: 32px; height: 32px; padding: 0; line-height: 1; font-size: 16px; }
 .theme-btn:hover { border-color: var(--accent); }
 .theme-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ── Header: urban-warfare wordmark ───────────────────────────────
+   Fixed dark palette in both themes, so the brand looks the same everywhere. */
+@font-face {
+  font-family: "Black Ops One"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../fonts/black-ops-one.woff2") format("woff2"); /* SIL Open Font License */
+}
+header.top {
+  --hq-bg: #23271f; --hq-sand: #d8cfae; --hq-blaze: #e2803a; --hq-dim: #a3a791;
+  position: relative; background: var(--hq-bg); border-bottom: 0; color: var(--hq-sand);
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 2px, transparent 2px 9px);
+}
+header.top::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+  background: repeating-linear-gradient(135deg, var(--hq-blaze) 0 12px, #151812 12px 24px);
+}
+header.top .inner { padding-bottom: 17px; }
+header.top .brand {
+  display: inline-flex; align-items: center; gap: 10px; color: var(--hq-sand);
+  font: 400 24px/1 "Black Ops One", Impact, "Arial Black", sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; text-shadow: 0 2px 0 #000;
+}
+header.top .brand:hover { text-decoration: none; color: #f1ead2; }
+.brand-hl { color: var(--hq-blaze); }
+.brand-mark { width: 26px; height: 26px; fill: none; stroke: var(--hq-blaze); stroke-width: 2; flex: none; }
+header.top nav a {
+  color: var(--hq-dim); text-transform: uppercase; letter-spacing: .08em; font-size: 13px; font-weight: 600;
+}
+header.top nav a:hover { color: var(--hq-sand); text-decoration: none; }
+header.top nav a.active { color: var(--hq-sand); box-shadow: inset 0 -2px 0 var(--hq-blaze); }
+header.top .badge { background: rgba(226,128,58,.15); color: var(--hq-blaze); border: 1px solid var(--hq-blaze); border-radius: 3px; text-transform: uppercase; letter-spacing: .06em; }
+header.top .muted { color: var(--hq-dim); }
+header.top button.link { color: var(--hq-blaze); text-transform: uppercase; letter-spacing: .06em; font-size: 13px; font-weight: 600; }
+header.top .theme-btn { color: var(--hq-sand); border-color: #444a3b; border-radius: 3px; }
+header.top .theme-btn:hover { border-color: var(--hq-blaze); }
+@media (max-width: 420px) { header.top .brand { font-size: 20px; } }
+
+/* ── Dashboard: range filter, calendar, recent list ── */
+.period-bar { align-items: center; }
+.recent a.row { color: inherit; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.recent a.row:hover { text-decoration: none; }
+.recent a.row:hover strong { color: var(--accent); }
+.recent > a.small { display: inline-block; margin-top: 10px; }
+.cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cal-title { flex: 1; display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+.cal-nav { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+  width: 34px; height: 34px; padding: 0; font-size: 20px; line-height: 1; }
+.cal-nav:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.cal-nav[disabled] { opacity: .3; cursor: default; }
+.cal-nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal-dow { font-size: 12px; color: var(--muted); padding-bottom: 2px; }
+.cal-day { aspect-ratio: 1; max-height: 44px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+a.cal-day.on { background: var(--accent); color: #fff; font-weight: 650; }
+a.cal-day.on:hover { text-decoration: none; filter: brightness(1.12); }
+.cal-day.today { box-shadow: inset 0 0 0 2px var(--accent); color: var(--text); font-weight: 650; }
+a.cal-day.on.today { box-shadow: inset 0 0 0 2px var(--text); }
+.cal-day.future { opacity: .45; }
+.calendar button.link { display: block; margin-left: auto; margin-right: auto; }

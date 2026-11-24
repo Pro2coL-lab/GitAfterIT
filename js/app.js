@@ -1,6 +1,6 @@
 // Views and routing. Hash routes: #/  #/sessions  #/session/<local_id>  #/exercise/<id>  #/routine
 (function () {
-  const { html, tile } = window.UI;
+  const { html, raw, tile } = window.UI;
   const { barChart, lineChart } = window.Charts;
   const F = window.Format;
   const M = window.Metrics;
@@ -18,64 +18,164 @@
 
   // ---------- helpers ----------
   const exerciseLink = (id, name) => html`<a href="#/exercise/${encodeURIComponent(id)}">${name}</a>`;
+  // JEFIT's total_time is start→finish (rest included); workout_time excludes rest, so it reads short.
+  const sessionTime = (s) => s.total_time || s.workout_time || null;
   function sessionMeta(s) {
     const v = M.sessionVolume(s);
-    return `${F.fmtDuration(s.workout_time ?? s.total_time)} · ${F.plural(M.sessionSets(s), "set")}${v > 0 ? ` · ${F.fmtWeight(v, 0)}` : ""}`;
+    return `${F.fmtDuration(sessionTime(s))} · ${F.plural(M.sessionSets(s), "set")}${v > 0 ? ` · ${F.fmtWeight(v, 0)}` : ""}`;
   }
   const sessionsSince = (start) => state.data.sessions.filter((s) => s.date >= start);
 
   // ---------- views ----------
-  function dashboard() {
-    const WEEKS = 12;
-    const start = M.weekStart(now()) - (WEEKS - 1) * 7 * DAY;
-    const sessions = sessionsSince(start);
-    const last30 = sessions.filter((s) => s.date >= now() - 30 * DAY);
+  const PERIOD_UI = {
+    day: { chip: "Daily", noun: "day", count: 14, sub: "Last 14 days" },
+    week: { chip: "Weekly", noun: "week", count: 12, sub: "Last 12 weeks" },
+    month: { chip: "Monthly", noun: "month", count: 12, sub: "Last 12 months" },
+    year: { chip: "Yearly", noun: "year", count: null, sub: "Every year on record" },
+  };
+  const sessionDay = (s) => M.dayKey(F.dateParts(s.date));
+  const todayKey = () => M.dayKey(F.dateParts(now()));
+
+  function dashboard(_m, params) {
+    const period = M.PERIODS.includes(params.get("view")) ? params.get("view") : "week";
+    const ui = PERIOD_UI[period];
+    const all = state.data.sessions; // newest first
+    const today = todayKey();
+    let count = ui.count;
+    if (count == null) { // yearly: from the first year with data to this year
+      const firstYear = all.length ? F.dateParts(all[all.length - 1].date).y : F.dateParts(now()).y;
+      count = Math.min(10, Math.max(1, F.dateParts(now()).y - firstYear + 1));
+    }
+    const buckets = M.periodRange(today, period, count);
+    const vol = new Map(buckets.map((k) => [k, 0]));
+    const n = new Map(buckets.map((k) => [k, 0]));
+    const inRange = [];
+    for (const s of all) {
+      const k = M.periodStart(sessionDay(s), period);
+      if (!vol.has(k)) continue;
+      inRange.push(s);
+      vol.set(k, vol.get(k) + M.sessionVolume(s));
+      n.set(k, n.get(k) + 1);
+    }
+
+    const last30 = all.filter((s) => s.date >= now() - 30 * DAY);
     const vol30 = last30.reduce((t, s) => t + M.sessionVolume(s), 0);
-    const avgTime = last30.length ? last30.reduce((t, s) => t + (s.workout_time ?? s.total_time ?? 0), 0) / last30.length : 0;
+    const timed30 = last30.map(sessionTime).filter((t) => t > 0);
+    const avgTime = timed30.length ? timed30.reduce((a, b) => a + b, 0) / timed30.length : null;
     const records30 = last30.reduce((t, s) => t + (s.records_broken ?? 0), 0);
 
-    const weeks = Array.from({ length: WEEKS }, (_, i) => start + i * 7 * DAY);
-    const vol = new Map(weeks.map((w) => [w, 0]));
-    const count = new Map(weeks.map((w) => [w, 0]));
-    for (const s of sessions) {
-      const w = M.weekStart(s.date);
-      if (!vol.has(w)) continue;
-      vol.set(w, vol.get(w) + M.sessionVolume(s));
-      count.set(w, count.get(w) + 1);
-    }
     const freq = new Map();
-    for (const s of sessions) for (const l of s.logs) {
+    for (const s of inRange) for (const l of s.logs) {
       const f = freq.get(l.exercise_id) ?? { name: l.exercise_name, n: 0 };
       f.n++;
       freq.set(l.exercise_id, f);
     }
     const top = [...freq.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+    const label = (k) => F.fmtPeriod(k, period);
+    const cap = ui.chip; // "Daily", "Weekly", …
 
     return html`
       <h1>Dashboard</h1>
-      <p class="sub">Last ${WEEKS} weeks of training from JEFIT.</p>
+      <p class="sub">Training from JEFIT.</p>
       <div class="tiles">
         ${tile("Workouts (30 days)", last30.length)}
         ${tile("Volume (30 days)", F.fmtWeight(vol30, 0), "weight × reps, working sets")}
         ${tile("Avg workout time", F.fmtDuration(avgTime))}
         ${tile("Records broken (30 days)", records30)}
       </div>
-      <div class="grid2 mt">
-        <div class="card"><strong>Weekly volume</strong>${barChart(weeks.map((w) => ({ label: F.fmtShortDate(w), value: F.fromLbs(vol.get(w)) })), F.weightUnit())}</div>
-        <div class="card"><strong>Workouts per week</strong>${barChart(weeks.map((w) => ({ label: F.fmtShortDate(w), value: count.get(w) })), "workouts", true)}</div>
+      <div class="row mt period-bar">
+        <div class="chips" role="group" aria-label="Chart range">
+          ${M.PERIODS.map((p) => html`<a class="chip${p === period ? " on" : ""}" href="#/?view=${p}"${p === period ? raw(' aria-current="true"') : ""}>${PERIOD_UI[p].chip}</a>`)}
+        </div>
+        <span class="muted small">${ui.sub} · ${F.plural(inRange.length, "workout")}</span>
       </div>
-      <h2>Recent workouts</h2>
-      ${sessions.length === 0 ? html`<p class="muted">No workouts logged in this period.</p>` : html`
-        <div class="list">
-          ${sessions.slice(0, 6).map((s) => html`
-            <a class="card row" href="#/session/${s.local_id}">
-              <span><strong>${F.fmtDate(s.date)}</strong> <span class="muted">· ${F.plural(s.logs.length, "exercise")}</span></span>
-              <span class="muted">${sessionMeta(s)}</span>
-            </a>`)}
-          <a href="#/sessions">All workouts →</a>
-        </div>`}
-      <h2>Most trained exercises</h2>
-      <div class="chips">${top.map(([id, f]) => html`<a class="chip" href="#/exercise/${encodeURIComponent(id)}">${f.name} · ${f.n}</a>`)}</div>`;
+      <div class="grid2 mt-s">
+        <div class="card"><strong>${cap} volume</strong>${barChart(buckets.map((k) => ({ label: label(k), value: F.fromLbs(vol.get(k)) })), F.weightUnit())}</div>
+        <div class="card"><strong>Workouts per ${ui.noun}</strong>${barChart(buckets.map((k) => ({ label: label(k), value: n.get(k) })), "workouts", true)}</div>
+      </div>
+      <div class="grid2 mt">
+        ${calendarCard()}
+        <div class="card recent">
+          <strong>Recent workouts</strong>
+          ${all.length === 0 ? html`<p class="muted">No workouts logged yet.</p>` : html`
+            <div class="mt-s">
+              ${all.slice(0, 6).map((s) => html`
+                <a class="row" href="#/session/${s.local_id}">
+                  <span><strong>${F.fmtShortDate(s.date)}</strong> <span class="muted">· ${F.plural(s.logs.length, "exercise")}</span></span>
+                  <span class="muted small">${sessionMeta(s)}</span>
+                </a>`)}
+            </div>
+            <a class="small" href="#/sessions">All workouts →</a>`}
+        </div>
+      </div>
+      <h2>Most trained exercises <span class="muted small">· ${ui.sub.toLowerCase()}</span></h2>
+      ${top.length ? html`<div class="chips">${top.map(([id, f]) => html`<a class="chip" href="#/exercise/${encodeURIComponent(id)}">${f.name} · ${f.n}</a>`)}</div>`
+        : html`<p class="muted">No workouts in this range.</p>`}`;
+  }
+
+  // ---------- calendar ----------
+  // Month shown is kept in state so the arrows can redraw just the calendar without a page reload.
+  function calendarCard() {
+    const today = todayKey();
+    const thisMonth = M.periodStart(today, "month");
+    const all = state.data.sessions;
+    const firstMonth = all.length ? M.periodStart(sessionDay(all[all.length - 1]), "month") : thisMonth;
+    let month = state.calMonth ?? thisMonth;
+    month = Math.min(thisMonth, Math.max(firstMonth, month));
+    state.calMonth = month;
+
+    const nextMonth = M.shiftPeriod(month, "month", 1);
+    const byDay = new Map();
+    for (const s of all) {
+      const k = sessionDay(s);
+      if (k < month || k >= nextMonth) continue;
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(s);
+    }
+    const days = Math.round((nextMonth - month) / DAY);
+    const lead = (new Date(month * 1000).getUTCDay() + 6) % 7; // Monday-first grid
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push(html`<span class="cal-day blank"></span>`);
+    for (let d = 1; d <= days; d++) {
+      const k = month + (d - 1) * DAY;
+      const list = byDay.get(k);
+      const cls = `cal-day${list ? " on" : ""}${k === today ? " today" : ""}${k > today ? " future" : ""}`;
+      if (list) {
+        const s = list[list.length - 1]; // earliest that day (list is newest first)
+        const tip = list.length > 1 ? `${list.length} workouts` : `${F.plural(s.logs.length, "exercise")} · ${sessionMeta(s)}`;
+        cells.push(html`<a class="${cls}" href="#/session/${s.local_id}" title="${tip}" aria-label="${F.fmtDate(s.date)}: ${tip}">${d}</a>`);
+      } else {
+        cells.push(html`<span class="${cls}">${d}</span>`);
+      }
+    }
+    const workouts = [...byDay.values()].reduce((t, l) => t + l.length, 0);
+    const off = (cond) => (cond ? raw(" disabled") : "");
+
+    return html`
+      <div class="card calendar" id="calendar">
+        <div class="cal-head">
+          <button type="button" class="cal-nav" data-action="cal-prev" aria-label="Previous month"${off(month <= firstMonth)}>‹</button>
+          <div class="cal-title"><strong>${F.fmtMonth(month)}</strong>
+            <span class="muted small">${F.plural(workouts, "workout")} · ${F.plural(byDay.size, "day")}</span></div>
+          <button type="button" class="cal-nav" data-action="cal-next" aria-label="Next month"${off(month >= thisMonth)}>›</button>
+        </div>
+        <div class="cal-grid">
+          ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => html`<span class="cal-dow">${d}</span>`)}
+          ${cells}
+        </div>
+        ${month !== thisMonth ? html`<button type="button" class="link small mt-s" data-action="cal-today">Back to this month</button>` : ""}
+      </div>`;
+  }
+
+  function moveCalendar(step) {
+    const el = document.getElementById("calendar");
+    if (!el || !state.data) return;
+    state.calMonth = step === 0 ? null : M.shiftPeriod(state.calMonth, "month", step);
+    const focused = document.activeElement?.dataset?.action;
+    el.outerHTML = String(calendarCard());
+    // Keep keyboard focus on the arrow that was pressed (if it's still enabled).
+    const again = focused && document.querySelector(`#calendar [data-action="${focused}"]:not([disabled])`);
+    (again || document.querySelector("#calendar .cal-nav:not([disabled])"))?.focus({ preventScroll: true });
   }
 
   const RANGES = [30, 90, 180, 365];
@@ -104,7 +204,7 @@
     return html`
       <p><a href="#/sessions">← History</a></p>
       <h1>${F.fmtDate(s.date)}</h1>
-      <p class="sub">${F.fmtDuration(s.workout_time ?? s.total_time)} workout · ${F.plural(s.logs.length, "exercise")}${v > 0 ? ` · ${F.fmtWeight(v, 0)} volume` : ""}${s.records_broken ? ` · ${F.plural(s.records_broken, "record")} broken` : ""}</p>
+      <p class="sub">${F.fmtDuration(sessionTime(s))} total${s.total_time && s.workout_time ? ` (${F.fmtDuration(s.workout_time)} active)` : ""} · ${F.plural(s.logs.length, "exercise")}${v > 0 ? ` · ${F.fmtWeight(v, 0)} volume` : ""}${s.records_broken ? ` · ${F.plural(s.records_broken, "record")} broken` : ""}</p>
       <div class="list">
         ${s.logs.map((l) => html`
           <div class="card">
@@ -241,7 +341,7 @@
 
   // ---------- router ----------
   const routes = [
-    [/^\/$/, "dashboard", () => dashboard()],
+    [/^\/$/, "dashboard", (m, q) => dashboard(m, q)],
     [/^\/sessions$/, "sessions", (_, q) => historyView(q)],
     [/^\/session\/(\d+)$/, "sessions", (m) => session(m[1])],
     [/^\/exercise\/([du]_\d+)$/, null, (m) => exercise(m[1])],
@@ -325,6 +425,9 @@
       history.replaceState(null, "", "#/");
       show({ data: window.Sample.snapshot(), updatedAt: null }, { demo: true });
     }
+    if (a.dataset.action === "cal-prev") moveCalendar(-1);
+    if (a.dataset.action === "cal-next") moveCalendar(1);
+    if (a.dataset.action === "cal-today") moveCalendar(0);
     if (a.dataset.action === "lock") {
       if (state.demo) { try { sessionStorage.removeItem(DEMO_KEY); } catch { /* ignore */ } }
       else await vault.lock();
@@ -336,7 +439,23 @@
     }
   });
 
-  window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+  // Only jump to the top when moving to a different page, not when a filter chip changes the query.
+  let lastPath = (location.hash.slice(1) || "/").split("?")[0];
+  window.addEventListener("hashchange", () => {
+    const path = (location.hash.slice(1) || "/").split("?")[0];
+    render();
+    if (path !== lastPath) window.scrollTo(0, 0);
+    lastPath = path;
+  });
+
+  // ← / → change the calendar month on the dashboard (ignored while typing).
+  document.addEventListener("keydown", (ev) => {
+    if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+    if (ev.target.closest?.("input, textarea, select, [contenteditable]")) return;
+    if (!document.getElementById("calendar")) return;
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); if (!document.querySelector('#calendar [data-action="cal-prev"]').disabled) moveCalendar(-1); }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); if (!document.querySelector('#calendar [data-action="cal-next"]').disabled) moveCalendar(1); }
+  });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.data && !state.demo) backgroundRefresh(); });
 
   // ---------- boot ----------

@@ -1,4 +1,4 @@
-# Repfolio
+# GitAfterIT
 
 Your JEFIT training history as a private dashboard. It uses plain static files and has no framework, no build step and no server. GitHub does the back-end work.
 

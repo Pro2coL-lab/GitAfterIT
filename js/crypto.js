@@ -49,7 +49,7 @@
 
   function validate(env) {
     if (!env || env.format !== FORMAT || env.v !== VERSION || !env.kdf?.salt || !env.iv || !env.ciphertext) {
-      throw new VaultError("bad_format", "The data file is not a Repfolio vault (or is from a newer version).");
+      throw new VaultError("bad_format", "The data file is not a GitAfterIT vault (or is from a newer version).");
     }
     return env;
   }
