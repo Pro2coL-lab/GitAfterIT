@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Repfolio</title>
+  <meta name="description" content="Your JEFIT training history, visualised.">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Repfolio">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/format.js" defer></script>
+  <script src="js/metrics.js" defer></script>
+  <script src="js/charts.js" defer></script>
+  <script src="js/crypto.js" defer></script>
+  <script src="js/snapshot.js" defer></script>
+  <script src="js/sample.js" defer></script>
+  <script src="js/vault.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body class="locked">
+  <header class="top">
+    <div class="inner">
+      <a href="#/" class="brand">Repfolio</a>
+      <nav>
+        <a href="#/" data-nav="dashboard">Dashboard</a>
+        <a href="#/sessions" data-nav="sessions">History</a>
+        <a href="#/routine" data-nav="routine">Routine</a>
+      </nav>
+      <span class="badge" id="demo-badge" hidden>Sample data</span>
+      <span class="muted small" id="sync-status"></span>
+      <button type="button" class="link" id="lock-btn" data-action="lock" hidden>Lock</button>
+    </div>
+  </header>
+  <main id="app"><p class="loading">Loading…</p></main>
+  <noscript><main><p>Repfolio needs JavaScript enabled.</p></main></noscript>
+</body>
+</html>
