@@ -1,0 +1,60 @@
+# Pull your JEFIT data, encrypt it, and publish the ciphertext to the `jefit-data` orphan branch.
+# Needs two repository secrets: JEFIT_TOKEN (read-only JEFIT token) and VAULT_PASSPHRASE.
+name: Sync JEFIT
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jefit-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run tests
+        run: node tools/run-tests.js
+
+      - name: Fetch the current vault (if any)
+        run: |
+          mkdir -p vault-out
+          if git fetch --depth=1 origin jefit-data 2>/dev/null; then
+            git show FETCH_HEAD:data.enc.json > vault-out/data.enc.json || rm -f vault-out/data.enc.json
+          fi
+
+      - name: Pull from JEFIT and encrypt
+        id: sync
+        env:
+          JEFIT_TOKEN: ${{ secrets.JEFIT_TOKEN }}
+          VAULT_PASSPHRASE: ${{ secrets.VAULT_PASSPHRASE }}
+          SYNC_DAYS: "730"
+        run: node tools/sync-jefit.js vault-out/data.enc.json
+
+      - name: Publish ciphertext to jefit-data
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd vault-out
+          git init -q -b jefit-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          printf '# Encrypted JEFIT data\n\nAES-256-GCM ciphertext written by the Sync JEFIT workflow. Unreadable without the passphrase.\n' > README.md
+          git add data.enc.json README.md
+          git commit -q -m "Sync JEFIT data"
+          # One commit, force-pushed: old ciphertext doesn't pile up in history.
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" jefit-data
