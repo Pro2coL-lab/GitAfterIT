@@ -155,3 +155,9 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
+# Repfolio: secrets never belong in this public repo
+.env.local
+.env.*.local
+# The encrypted vault lives on the jefit-data branch, not main
+data.enc.json
+vault-out/
