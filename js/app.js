@@ -123,6 +123,37 @@
   };
   const setsView = (params) => (SETS_UI[params.get("sets")] ? params.get("sets") : "this");
 
+  // Static explainer under the chart. All text is literal, so nothing here needs escaping.
+  const landmarkHelp = html`
+    <details class="mt-s landmark-help">
+      <summary class="small">What do MEV, MAV and MRV mean?</summary>
+      <div class="small mt-s">
+        <p>These are the <strong>volume landmarks</strong> from <em>Scientific Principles of Hypertrophy Training</em>
+          (Israetel, Hoffmann &amp; Smith). Volume here means hard working sets per muscle per week.</p>
+        <dl>
+          <dt>MV · Maintenance Volume</dt>
+          <dd>The fewest sets that keep the muscle you already have. Useful for muscles you aren't focusing on, or during a busy stretch. Not drawn on the chart.</dd>
+          <dt><i class="sw b-under"></i>MEV · Minimum Effective Volume</dt>
+          <dd>The fewest sets that still make a muscle grow. Below it (the gray zone) you're mostly maintaining, not building.</dd>
+          <dt><i class="sw b-mav"></i>MAV · Maximum Adaptive Volume</dt>
+          <dd>The range where you grow the most for the effort. The green zone is the target for most weeks of a training block.</dd>
+          <dt><i class="sw b-high"></i>MAV–MRV</dt>
+          <dd>Still productive, but recovery is getting hard. Fine for the last week or two of a block, not as a steady state.</dd>
+          <dt><i class="sw mrv"></i>MRV · Maximum Recoverable Volume</dt>
+          <dd>The most you can do and still recover. Past the red line, fatigue builds faster than you recover, and performance and growth usually drop.</dd>
+        </dl>
+        <p><strong>How the book uses them:</strong> start a training block (mesocycle) near MEV, add about 1–2 sets per muscle each week
+          while your performance keeps improving, and stop before MRV. Then take a lighter deload week and start the next block
+          back near MEV.</p>
+        <p><strong>They're starting points, not rules.</strong> Your own landmarks shift with training experience, sleep, stress,
+          diet and exercise choice. If a muscle keeps getting stronger and recovers well, it can take more; if it stalls or stays
+          sore, it needs less.</p>
+        <p class="muted">How this chart counts: working sets only (warm-ups are skipped). The muscle an exercise mainly trains gets 1 set;
+          a muscle that helps (like triceps on bench press) gets ½ a set. Bars are colored by zone: gray below MEV, blue MEV–MAV,
+          green in MAV, orange MAV–MRV, red above MRV.</p>
+      </div>
+    </details>`;
+
   function muscleVolumeCard(period, params) {
     const view = setsView(params);
     const v = SETS_UI[view];
@@ -167,6 +198,7 @@
           ${unmapped.length ? html`<p class="small muted mt-s">Not counted (no muscle rule matches the name): ${unmapped.map((u) => `${u.name} ×${n1(u.sets)}`).join(", ")}.</p>` : ""}
           <p class="small muted">Landmarks after Israetel, Hoffmann &amp; Smith, <em>Scientific Principles of Hypertrophy Training</em>. (2°) = secondary.</p>
         </details>
+        ${landmarkHelp}
       </div>`;
   }
 

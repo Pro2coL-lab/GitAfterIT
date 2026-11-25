@@ -174,3 +174,12 @@ th.num, td.num { text-align: right; }
 details summary { cursor: pointer; color: var(--accent); }
 /* On phones the chart shrinks a lot, so draw its text larger (SVG units) to stay readable. */
 @media (max-width: 600px) { .chart.landmarks text { font-size: 22px; } }
+/* "What do MEV, MAV and MRV mean?" explainer */
+.landmark-help p { margin: 0 0 10px; }
+.landmark-help dl { margin: 0 0 10px; display: grid; grid-template-columns: minmax(150px, max-content) 1fr; gap: 6px 16px; }
+.landmark-help dt { font-weight: 650; display: flex; align-items: baseline; gap: 6px; }
+.landmark-help dd { margin: 0; }
+.landmark-help .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--border); flex: none; }
+.landmark-help .sw.b-under { background: var(--b-under); } .landmark-help .sw.b-mav { background: var(--b-mav); }
+.landmark-help .sw.b-high { background: var(--b-high); } .landmark-help .sw.mrv { width: 3px; height: 12px; border: 0; background: var(--z-over); }
+@media (max-width: 600px) { .landmark-help dl { grid-template-columns: 1fr; gap: 2px; } .landmark-help dd { margin-bottom: 8px; } }
