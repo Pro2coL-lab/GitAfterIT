@@ -33,6 +33,24 @@ test("only GETs, always with limit on /v2/exercises", async () => {
   assert.ok(fake.calls.some((c) => c.startsWith("/api/v2/user/sessions?")));
 });
 
+test("fetches sessions from SYNC_SINCE (default 1 Jan 2020) up to now", async () => {
+  const fake = createFakeJefit({ nowSec: NOW });
+  await sync(opts(fake, tmp()));
+  const starts = fake.calls.filter((c) => c.startsWith("/api/v2/user/sessions?"))
+    .map((c) => Number(new URLSearchParams(c.split("?")[1]).get("startDate")));
+  assert.equal(Math.min(...starts), Date.UTC(2020, 0, 1) / 1000);
+  assert.ok(Math.max(...starts) <= NOW);
+  const fake2 = createFakeJefit({ nowSec: NOW });
+  await sync(opts(fake2, tmp(), { since: "2025-06-01" }));
+  const first = fake2.calls.find((c) => c.startsWith("/api/v2/user/sessions?"));
+  assert.equal(Number(new URLSearchParams(first.split("?")[1]).get("startDate")), Date.UTC(2025, 5, 1) / 1000);
+});
+
+test("a malformed SYNC_SINCE fails loudly instead of syncing nothing", async () => {
+  const fake = createFakeJefit({ nowSec: NOW });
+  await assert.rejects(sync(opts(fake, tmp(), { since: "Jan 2020" })), /SYNC_SINCE/);
+});
+
 test("second sync with no new data does not rewrite the file", async () => {
   const fake = createFakeJefit({ nowSec: NOW });
   const out = tmp();

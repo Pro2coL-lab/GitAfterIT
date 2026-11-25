@@ -7,7 +7,7 @@ Your JEFIT training history as a private dashboard. It uses plain static files a
 ### 1. Sync and storage: GitHub Actions and an encrypted file
 
 - **`.github/workflows/sync.yml`** runs every 6 hours, or on demand from the Actions tab. It runs `tools/sync-jefit.js` on Node 20.
-- **What the sync reads:** the **JEFIT Open Training API**, using your read-only token from the `JEFIT_TOKEN` secret. It fetches two years of sessions with their logs, your current routine, and the exercise names.
+- **What the sync reads:** the **JEFIT Open Training API**, using your read-only token from the `JEFIT_TOKEN` secret. It fetches every session since 1 January 2020 (`SYNC_SINCE` in the workflow) with their logs, your current routine, and the exercise names.
 - **Encryption:** the sync encrypts the snapshot with WebCrypto. Your `VAULT_PASSPHRASE` secret goes through PBKDF2-SHA256 (600,000 rounds) to make an AES-256-GCM key.
 - **Storage:** the ciphertext is force-pushed as a single commit to the orphan branch **`jefit-data`** (`data.enc.json`). GitHub only ever holds ciphertext.
 - **Skipped writes:** if nothing changed, nothing is written. The salt is reused between syncs, so devices you've already unlocked stay unlocked.

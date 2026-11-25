@@ -4,7 +4,7 @@
 //   JEFIT_TOKEN=jfit_pat_... VAULT_PASSPHRASE=... node tools/sync-jefit.js [out-file]
 //
 // Env: JEFIT_TOKEN (required), VAULT_PASSPHRASE (required, 12+ chars),
-//      SYNC_DAYS (default 730), VAULT_FILE (default data.enc.json)
+//      SYNC_SINCE (first date to fetch, YYYY-MM-DD; default 2020-01-01), VAULT_FILE (default data.enc.json)
 "use strict";
 
 const fs = require("fs");
@@ -13,16 +13,25 @@ const Snapshot = require("../js/snapshot.js");
 const { createClient, JefitError } = require("./jefit-client.js");
 
 const MIN_PASSPHRASE = 12;
+// Everything from this date on is fetched; older workouts are left out.
+const DEFAULT_SINCE = "2020-01-01";
+
+/** "YYYY-MM-DD" → Unix seconds at 00:00 UTC that day. */
+function sinceToUnix(since) {
+  const t = /^\d{4}-\d{2}-\d{2}$/.test(since) ? Date.parse(`${since}T00:00:00Z`) : NaN;
+  if (Number.isNaN(t)) throw new Error(`SYNC_SINCE must be a date like 2020-01-01 (got "${since}").`);
+  return t / 1000;
+}
 
 /**
  * @returns {{ changed: boolean, sessions: number, outFile: string }}
  */
-async function sync({ token, passphrase, outFile, days = 730, fetch, sleep, nowSec = Math.floor(Date.now() / 1000), iterations, log = () => {} }) {
+async function sync({ token, passphrase, outFile, since = DEFAULT_SINCE, fetch, sleep, nowSec = Math.floor(Date.now() / 1000), iterations, log = () => {} }) {
   if (!passphrase || passphrase.length < MIN_PASSPHRASE) {
     throw new Error(`VAULT_PASSPHRASE must be at least ${MIN_PASSPHRASE} characters.`);
   }
   const client = createClient({ token, fetch, sleep, log });
-  const raw = await client.fetchAll({ start: nowSec - days * 86400, end: nowSec + 86400 });
+  const raw = await client.fetchAll({ start: sinceToUnix(since), end: nowSec + 86400 });
   const snapshot = Snapshot.build(raw);
 
   // Keep the existing salt so devices that already unlocked keep working,
@@ -61,7 +70,7 @@ if (require.main === module) {
     token: process.env.JEFIT_TOKEN,
     passphrase: process.env.VAULT_PASSPHRASE,
     outFile,
-    days: Number(process.env.SYNC_DAYS) || 730,
+    since: process.env.SYNC_SINCE || DEFAULT_SINCE,
     log: (m) => console.log(m),
   }).then((r) => {
     // Counts only — never print workout data in a public repo's Actions log.
@@ -73,4 +82,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { sync };
+module.exports = { sync, sinceToUnix, DEFAULT_SINCE };

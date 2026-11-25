@@ -235,15 +235,18 @@
     (again || document.querySelector("#calendar .cal-nav:not([disabled])"))?.focus({ preventScroll: true });
   }
 
-  const RANGES = [30, 90, 180, 365];
+  const RANGES = [30, 90, 180, 365, "all"];
   function historyView(params) {
-    const days = RANGES.includes(Number(params.get("days"))) ? Number(params.get("days")) : 90;
-    const sessions = sessionsSince(now() - days * DAY);
+    const q = params.get("days");
+    const days = q === "all" ? "all" : RANGES.includes(Number(q)) ? Number(q) : 90;
+    const sessions = days === "all" ? state.data.sessions : sessionsSince(now() - days * DAY);
+    const oldest = state.data.sessions[state.data.sessions.length - 1];
+    const span = days === "all" ? (oldest ? `since ${F.fmtDate(oldest.date)}` : "on record") : `in the last ${days} days`;
     return html`
       <h1>Workout history</h1>
-      <p class="sub">${F.plural(sessions.length, "workout")} in the last ${days} days.</p>
+      <p class="sub">${F.plural(sessions.length, "workout")} ${span}.</p>
       <div class="chips mb">
-        ${RANGES.map((r) => html`<a class="chip${r === days ? " on" : ""}" href="#/sessions?days=${r}">${r} days</a>`)}
+        ${RANGES.map((r) => html`<a class="chip${r === days ? " on" : ""}" href="#/sessions?days=${r}">${r === "all" ? "All" : `${r} days`}</a>`)}
       </div>
       <div class="list">
         ${sessions.map((s) => html`
@@ -282,23 +285,37 @@
       </div>`;
   }
 
-  function exercise(id) {
-    const since = now() - 365 * DAY;
+  function exercise(id, params) {
+    const all = params.get("range") === "all";
+    const since = all ? -Infinity : now() - 365 * DAY;
     const logs = [];
+    let older = 0;
     for (const s of state.data.sessions) {
-      if (s.date < since) continue;
-      for (const l of s.logs) if (l.exercise_id === id) logs.push({ ...l, session_local_id: s.local_id });
+      for (const l of s.logs) {
+        if (l.exercise_id !== id) continue;
+        if (s.date < since) older++;
+        else logs.push({ ...l, session_local_id: s.local_id });
+      }
     }
     logs.sort((a, b) => a.date - b.date);
     const name = state.data.exercises[id] ?? logs[0]?.exercise_name;
     if (!name) return notFound("That exercise isn't in your synced data.");
-    if (!logs.length) return html`<p><a href="#/">← Dashboard</a></p><h1>${name}</h1><p class="muted">No logs for this exercise in the last year.</p>`;
+    const base = `#/exercise/${encodeURIComponent(id)}`;
+    const rangeChips = html`<div class="chips mb" role="group" aria-label="Range">
+      <a class="chip${all ? "" : " on"}" href="${base}">Last year</a><a class="chip${all ? " on" : ""}" href="${base}?range=all">All</a></div>`;
+    if (!logs.length) {
+      return html`<p><a href="#/">← Dashboard</a></p><h1>${name}</h1>${rangeChips}
+        <p class="muted">No logs for this exercise in the last year.${older ? html` <a href="${base}?range=all">Show all ${F.plural(older, "older workout")}</a>.` : ""}</p>`;
+    }
+    // Labels need the year once a chart spans more than one.
+    const multiYear = F.dateParts(logs[0].date).y !== F.dateParts(logs[logs.length - 1].date).y;
+    const pointLabel = (date) => (multiYear && all ? F.fmtPeriod(M.dayKey(F.dateParts(date)), "month") : F.fmtShortDate(date));
 
     const counts = new Map();
     for (const l of logs) counts.set(l.record_type, (counts.get(l.record_type) ?? 0) + 1);
     const type = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
     const points = logs.filter((l) => l.record_type === type).map(M.progressPoint);
-    const series = (key, conv = (v) => v) => points.filter((p) => p[key] !== undefined).map((p) => ({ label: F.fmtShortDate(p.date), value: conv(p[key]) }));
+    const series = (key, conv = (v) => v) => points.filter((p) => p[key] !== undefined).map((p) => ({ label: pointLabel(p.date), value: conv(p[key]) }));
     const best = (key) => Math.max(0, ...points.map((p) => p[key] ?? 0));
     const u = F.weightUnit();
 
@@ -328,7 +345,8 @@
     return html`
       <p><a href="#/">← Dashboard</a></p>
       <h1>${name}</h1>
-      <p class="sub">${F.plural(logs.length, "workout")} in the last year.</p>
+      <p class="sub">${F.plural(logs.length, "workout")} ${all ? `since ${F.fmtDate(logs[0].date)}` : "in the last year"}.</p>
+      ${rangeChips}
       <div class="tiles">${tile("Workouts", logs.length)}${spec.tiles.map(([l, v]) => tile(l, v))}</div>
       <div class="grid2 mt">
         ${spec.charts.map(([title, data, unit]) => html`<div class="card"><strong>${title}</strong>${lineChart(data, unit)}</div>`)}
@@ -401,7 +419,7 @@
     [/^\/$/, "dashboard", (m, q) => dashboard(m, q)],
     [/^\/sessions$/, "sessions", (_, q) => historyView(q)],
     [/^\/session\/(\d+)$/, "sessions", (m) => session(m[1])],
-    [/^\/exercise\/([du]_\d+)$/, null, (m) => exercise(m[1])],
+    [/^\/exercise\/([du]_\d+)$/, null, (m, q) => exercise(m[1], q)],
     [/^\/routine$/, "routine", () => routine()],
   ];
 

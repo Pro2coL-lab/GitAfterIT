@@ -41,7 +41,7 @@ jobs:
         env:
           JEFIT_TOKEN: ${{ secrets.JEFIT_TOKEN }}
           VAULT_PASSPHRASE: ${{ secrets.VAULT_PASSPHRASE }}
-          SYNC_DAYS: "730"
+          SYNC_SINCE: "2020-01-01"
         run: node tools/sync-jefit.js vault-out/data.enc.json
 
       - name: Publish ciphertext to jefit-data
