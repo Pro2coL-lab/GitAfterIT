@@ -60,5 +60,39 @@ function lineChart(points, unit) {
   });
 }
 
-  return { barChart, lineChart, niceTicks };
+/**
+ * Horizontal bars of weekly sets per muscle, drawn over each muscle's landmark bands
+ * (below MEV · MEV–MAV · MAV · MAV–MRV, with a tick at MRV).
+ * rows: [{ name, effective, mev, mav: [lo, hi], mrv, zone, tip }]
+ */
+function landmarkChart(rows) {
+  if (!rows.length) return html`<p class="muted">No data.</p>`;
+  // Wider than the other charts so its text renders near 13px in a full-width card.
+  const CW = 760, LABEL = 140, VALUE = 60, ROW = 30, TOP = 4, AXIS = 24;
+  const x0 = LABEL, x1 = CW - VALUE;
+  const ticks = niceTicks(0, Math.max(...rows.map((r) => Math.max(r.mrv, r.effective))), 5);
+  const max = ticks[ticks.length - 1];
+  const x = (v) => x0 + ((x1 - x0) * Math.min(v, max)) / max;
+  const h = TOP + rows.length * ROW + AXIS;
+  const band = (cls, from, to, y) => (to > from
+    ? html`<rect class="band ${cls}" x="${x(from)}" y="${y}" width="${x(to) - x(from)}" height="${ROW - 8}"/>` : "");
+  const body = rows.map((r, i) => {
+    const y = TOP + i * ROW + 4, mid = y + (ROW - 8) / 2;
+    return html`
+      <g><title>${r.tip}</title>
+        <text class="tick" x="${x0 - 8}" y="${mid + 4}" text-anchor="end">${r.name}</text>
+        ${band("b-under", 0, r.mev, y)}${band("b-low", r.mev, r.mav[0], y)}${band("b-mav", r.mav[0], r.mav[1], y)}${band("b-high", r.mav[1], r.mrv, y)}
+        <line class="mrv" x1="${x(r.mrv)}" x2="${x(r.mrv)}" y1="${y - 2}" y2="${y + ROW - 6}"/>
+        ${r.effective > 0 ? html`<rect class="sets z-${r.zone}" rx="2" x="${x0}" y="${mid - 4}" width="${Math.max(2, x(r.effective) - x0)}" height="8"/>` : ""}
+        <text class="val z-${r.zone}" x="${CW}" y="${mid + 4}" text-anchor="end">${fmtNum(r.effective)}</text>
+      </g>`;
+  });
+  const axisY = TOP + rows.length * ROW;
+  const axis = ticks.map((t) => html`
+    <line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${TOP}" y2="${axisY}"/>
+    <text class="tick" x="${x(t)}" y="${axisY + 16}" text-anchor="middle">${fmtNum(t)}</text>`);
+  return html`<div class="chart landmarks"><svg viewBox="0 0 ${CW} ${h}" role="img" aria-label="Weekly sets per muscle group compared with volume landmarks">${axis}${body}</svg></div>`;
+}
+
+  return { barChart, lineChart, landmarkChart, niceTicks };
 });

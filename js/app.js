@@ -1,9 +1,10 @@
 // Views and routing. Hash routes: #/  #/sessions  #/session/<local_id>  #/exercise/<id>  #/routine
 (function () {
   const { html, raw, tile } = window.UI;
-  const { barChart, lineChart } = window.Charts;
+  const { barChart, lineChart, landmarkChart } = window.Charts;
   const F = window.Format;
   const M = window.Metrics;
+  const MU = window.Muscles;
   const cfg = window.REPFOLIO_CONFIG;
 
   const DAY = 86400;
@@ -85,7 +86,7 @@
       </div>
       <div class="row mt period-bar">
         <div class="chips" role="group" aria-label="Chart range">
-          ${M.PERIODS.map((p) => html`<a class="chip${p === period ? " on" : ""}" href="#/?view=${p}"${p === period ? raw(' aria-current="true"') : ""}>${PERIOD_UI[p].chip}</a>`)}
+          ${M.PERIODS.map((p) => html`<a class="chip${p === period ? " on" : ""}" href="#/?view=${p}&amp;sets=${setsView(params)}"${p === period ? raw(' aria-current="true"') : ""}>${PERIOD_UI[p].chip}</a>`)}
         </div>
         <span class="muted small">${ui.sub} · ${F.plural(inRange.length, "workout")}</span>
       </div>
@@ -93,6 +94,7 @@
         <div class="card"><strong>${cap} volume</strong>${barChart(buckets.map((k) => ({ label: label(k), value: F.fromLbs(vol.get(k)) })), F.weightUnit())}</div>
         <div class="card"><strong>Workouts per ${ui.noun}</strong>${barChart(buckets.map((k) => ({ label: label(k), value: n.get(k) })), "workouts", true)}</div>
       </div>
+      ${muscleVolumeCard(period, params)}
       <div class="grid2 mt">
         ${calendarCard()}
         <div class="card recent">
@@ -111,6 +113,61 @@
       <h2>Most trained exercises <span class="muted small">· ${ui.sub.toLowerCase()}</span></h2>
       ${top.length ? html`<div class="chips">${top.map(([id, f]) => html`<a class="chip" href="#/exercise/${encodeURIComponent(id)}">${f.name} · ${f.n}</a>`)}</div>`
         : html`<p class="muted">No workouts in this range.</p>`}`;
+  }
+
+  // ---------- weekly sets per muscle ----------
+  const SETS_UI = {
+    this: { chip: "This week", weeks: 1, from: 0 },
+    last: { chip: "Last week", weeks: 1, from: -1 },
+    avg4: { chip: "4-week avg", weeks: 4, from: -4 }, // the 4 complete weeks before this one
+  };
+  const setsView = (params) => (SETS_UI[params.get("sets")] ? params.get("sets") : "this");
+
+  function muscleVolumeCard(period, params) {
+    const view = setsView(params);
+    const v = SETS_UI[view];
+    const thisWeek = M.periodStart(todayKey(), "week");
+    const start = M.shiftPeriod(thisWeek, "week", v.from);
+    const end = M.shiftPeriod(start, "week", v.weeks);
+    const sessions = state.data.sessions.filter((s) => { const k = sessionDay(s); return k >= start && k < end; });
+    const { rows, unmapped } = MU.tally(sessions, { weeks: v.weeks });
+    const range = v.weeks === 1 ? `Week of ${F.fmtPeriod(start, "week")}` : `${F.fmtPeriod(start, "week")} – ${F.fmtPeriod(M.shiftPeriod(end, "day", -1), "day")}`;
+    const n1 = (x) => Number(x.toFixed(1));
+    const chartRows = rows.map((r) => {
+      const zone = MU.zone(r, r.effective);
+      return { ...r, zone, tip: `${r.name}: ${n1(r.effective)} sets (${n1(r.primary)} primary + ${n1(r.secondary)} secondary × ½) · MEV ${r.mev} · MAV ${r.mav[0]}–${r.mav[1]} · MRV ${r.mrv} · ${MU.ZONE_LABEL[zone]}` };
+    });
+    const exList = (r) => (r.exercises.length
+      ? r.exercises.map((e) => `${e.name}${e.role === "secondary" ? " (2°)" : ""} ×${n1(e.sets)}`).join(", ") : "—");
+
+    return html`
+      <div class="card mt">
+        <div class="row">
+          <strong>Weekly sets per muscle</strong>
+          <div class="chips" role="group" aria-label="Weeks counted">
+            ${Object.entries(SETS_UI).map(([k, o]) => html`<a class="chip${k === view ? " on" : ""}" href="#/?view=${period}&amp;sets=${k}"${k === view ? raw(' aria-current="true"') : ""}>${o.chip}</a>`)}
+          </div>
+        </div>
+        <p class="muted small mt-s">${range} · ${F.plural(sessions.length, "workout")}${v.weeks > 1 ? " · sets per week" : ""}. Working sets; a secondary muscle counts half a set.</p>
+        ${landmarkChart(chartRows)}
+        <div class="legend small muted">
+          <span><i class="sw b-under"></i>Below MEV</span><span><i class="sw b-low"></i>MEV–MAV</span>
+          <span><i class="sw b-mav"></i>MAV (target)</span><span><i class="sw b-high"></i>MAV–MRV</span><span><i class="sw mrv"></i>MRV</span>
+        </div>
+        <details class="mt-s">
+          <summary class="small">Breakdown by exercise</summary>
+          <div class="scroll-x"><table class="mt-s small">
+            <thead><tr><th>Muscle</th><th>Exercises</th><th class="num">Primary</th><th class="num">Secondary</th><th class="num">Total</th><th class="num">MEV · MAV · MRV</th><th>Status</th></tr></thead>
+            <tbody>${chartRows.map((r) => html`
+              <tr><td class="nowrap"><strong>${r.name}</strong></td><td class="muted">${exList(r)}</td>
+                <td class="num">${n1(r.primary)}</td><td class="num">${n1(r.secondary)}</td><td class="num"><strong>${n1(r.effective)}</strong></td>
+                <td class="num nowrap muted">${r.mev} · ${r.mav[0]}–${r.mav[1]} · ${r.mrv}</td><td class="nowrap z-${r.zone}">${MU.ZONE_LABEL[r.zone]}</td></tr>`)}
+            </tbody>
+          </table></div>
+          ${unmapped.length ? html`<p class="small muted mt-s">Not counted (no muscle rule matches the name): ${unmapped.map((u) => `${u.name} ×${n1(u.sets)}`).join(", ")}.</p>` : ""}
+          <p class="small muted">Landmarks after Israetel, Hoffmann &amp; Smith, <em>Scientific Principles of Hypertrophy Training</em>. (2°) = secondary.</p>
+        </details>
+      </div>`;
   }
 
   // ---------- calendar ----------

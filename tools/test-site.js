@@ -22,6 +22,7 @@ test("scripts load after their dependencies", () => {
   before("snapshot.js", "sample.js");
   before("crypto.js", "vault.js");
   before("config.js", "app.js");
+  before("muscles.js", "app.js");
   assert.equal(order[order.length - 1], "app.js");
 });
 

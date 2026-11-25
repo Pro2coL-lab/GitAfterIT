@@ -2,6 +2,8 @@
   --bg: #f6f7f9; --surface: #ffffff; --text: #14171c; --muted: #5d6673;
   --border: #e3e6eb; --accent: #2563eb; --accent-soft: #e6eefe; --danger: #b42318; --danger-soft: #fdecea;
   --chart-1: #2563eb; --chart-2: #0d9488;
+  --z-low: #2563eb; --z-mav: #15803d; --z-high: #b45309; --z-over: #b42318;
+  --b-under: #eef0f3; --b-low: #e6eefe; --b-mav: #d3f0dc; --b-high: #fbe9d0;
 }
 :root { color-scheme: light; }
 /* Dark palette: follows the device unless the toggle (js/theme.js) set data-theme on <html>. */
@@ -11,6 +13,8 @@
     --bg: #0f1216; --surface: #171b21; --text: #e8ebef; --muted: #98a2b0;
     --border: #2a3038; --accent: #6b9bff; --accent-soft: #1c2840; --danger: #ff8a7a; --danger-soft: #3a1d1a;
     --chart-1: #6b9bff; --chart-2: #2dd4bf;
+    --z-low: #6b9bff; --z-mav: #4ade80; --z-high: #fbbf24; --z-over: #ff8a7a;
+    --b-under: #1d2229; --b-low: #1c2840; --b-mav: #173524; --b-high: #3a2c14;
   }
 }
 :root[data-theme="dark"] {
@@ -18,6 +22,8 @@
   --bg: #0f1216; --surface: #171b21; --text: #e8ebef; --muted: #98a2b0;
   --border: #2a3038; --accent: #6b9bff; --accent-soft: #1c2840; --danger: #ff8a7a; --danger-soft: #3a1d1a;
   --chart-1: #6b9bff; --chart-2: #2dd4bf;
+  --z-low: #6b9bff; --z-mav: #4ade80; --z-high: #fbbf24; --z-over: #ff8a7a;
+  --b-under: #1d2229; --b-low: #1c2840; --b-mav: #173524; --b-high: #3a2c14;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text);
@@ -143,3 +149,28 @@ a.cal-day.on:hover { text-decoration: none; filter: brightness(1.12); }
 a.cal-day.on.today { box-shadow: inset 0 0 0 2px var(--text); }
 .cal-day.future { opacity: .45; }
 .calendar button.link { display: block; margin-left: auto; margin-right: auto; }
+
+/* ── Weekly sets per muscle (landmark chart) ── */
+.landmarks .band.b-under, .legend .sw.b-under { fill: var(--b-under); background: var(--b-under); }
+.landmarks .band.b-low, .legend .sw.b-low { fill: var(--b-low); background: var(--b-low); }
+.landmarks .band.b-mav, .legend .sw.b-mav { fill: var(--b-mav); background: var(--b-mav); }
+.landmarks .band.b-high, .legend .sw.b-high { fill: var(--b-high); background: var(--b-high); }
+.landmarks .mrv { stroke: var(--z-over); stroke-width: 2; }
+.landmarks .sets { fill: var(--muted); }
+.landmarks .val { font-size: 13px; font-weight: 650; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.landmarks .sets.z-low { fill: var(--z-low); } .landmarks .val.z-low { fill: var(--z-low); }
+.landmarks .sets.z-optimal { fill: var(--z-mav); } .landmarks .val.z-optimal { fill: var(--z-mav); }
+.landmarks .sets.z-high { fill: var(--z-high); } .landmarks .val.z-high { fill: var(--z-high); }
+.landmarks .sets.z-over { fill: var(--z-over); } .landmarks .val.z-over { fill: var(--z-over); }
+.landmarks g:hover .sets { opacity: .75; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--border); }
+.legend .sw.mrv { width: 3px; height: 12px; border: 0; background: var(--z-over); }
+td.z-low { color: var(--z-low); } td.z-optimal { color: var(--z-mav); } td.z-high { color: var(--z-high); } td.z-over { color: var(--z-over); }
+td.z-none, td.z-under { color: var(--muted); }
+th.num, td.num { text-align: right; }
+.scroll-x { overflow-x: auto; }
+details summary { cursor: pointer; color: var(--accent); }
+/* On phones the chart shrinks a lot, so draw its text larger (SVG units) to stay readable. */
+@media (max-width: 600px) { .chart.landmarks text { font-size: 22px; } }
